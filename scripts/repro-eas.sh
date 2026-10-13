@@ -61,6 +61,12 @@ cat <<'EOF'
      open the app, screenshot the whole screen.
   3. Expected: Updates.runtimeVersion == 2.0.0 on BOTH.
      Actual (bug): Play build shows the v1 value.
+  4. Screenshot Play Console > Grow users > Translations > App strings
+     (automatic app-string translation on/off? prime suspect per #48148).
+  5. Locale-switch test: switch device language to English, reinstall the
+     Play build, re-read Updates.runtimeVersion. Flips to correct?
+     => Play-injected locale split is overriding the default.
+  6. With adb: bash scripts/pull-device-splits.sh > evidence/device-splits.txt
 
 == Step 6 (optional): prove OTA rejection ==
   1. eas update --channel production --message "ota-vs-v2"

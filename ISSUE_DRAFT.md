@@ -7,7 +7,7 @@
 
 ## Summary
 
-Android builds distributed as an AAB through Google Play embed a **stale** `expo-updates` `runtimeVersion` (`expo_runtime_version` in `strings.xml` / `AndroidManifest.xml` meta-data), so OTA updates are rejected with `updateRejectedBySelectionPolicy`. APK builds and iOS are correct. Follow-up to #41694 (closed for missing MRE).
+Android builds distributed as an AAB through Google Play embed a **stale** `expo-updates` `runtimeVersion` (`expo_runtime_version` in `strings.xml` / `AndroidManifest.xml` meta-data), so OTA updates are rejected with `updateRejectedBySelectionPolicy`. APK builds and iOS are correct. Follow-up to #41694 (closed for missing MRE); same mechanism as #48148 (open, with device-level proof of Play-side injection).
 
 ## Link to the minimal reproducible example
 
@@ -26,6 +26,9 @@ Stock Expo SDK 57 blank app + `expo-updates`, `expo-doctor` 21/21. Its single sc
 <!-- Jon: attach evidence/ here -->
 <!-- - evidence/apk-v2-correct.png -->
 <!-- - evidence/play-aab-v2-stale.png -->
+<!-- - evidence/play-aab-v2-english.png (locale-switch test) -->
+<!-- - evidence/play-translation-setting.png (Play Console translation setting) -->
+<!-- - evidence/device-splits.txt (`bash scripts/pull-device-splits.sh` output) -->
 <!-- - evidence/play-ota-rejected.log -->
 <!-- - evidence/inspect-aab-v2.txt (`bash scripts/inspect-aab.sh` output) -->
 
@@ -53,7 +56,10 @@ Local (no EAS/Play) forensics included in the repo:
 bash scripts/verify-local.sh   # prebuild + grep strings.xml/manifest across bump + dirty/clean prebuilds
 bash scripts/inspect-apk.sh <v2.apk>
 bash scripts/inspect-aab.sh <v2.aab>
+bash scripts/pull-device-splits.sh  # adb: base.apk vs split_config.*.apk per-locale grep
 ```
+
+Play-side checks: note Play Console → Grow users → Translations → App strings (automatic app-string translation on/off), and repeat the on-device read after switching device language to English + reinstalling — if the stale value flips to correct, a Play-injected locale-qualified split is overriding the default (#48148 signature).
 
 ## Environment
 
@@ -74,6 +80,7 @@ expo-env-info 2.1.0 environment info:
 
 - EAS CLI: <!-- Jon: `eas --version` output -->
 - Device / Play track: <!-- Jon: device model + Android version + internal track -->
+- Play Console → Grow users → Translations → App strings: <!-- Jon: automatic translation on/off? -->
 - `app.json` updates config: explicit string `runtimeVersion` top-level **and** `android.runtimeVersion`, `updates.url: https://u.expo.dev/<project-id>`, plugins `["expo-updates"]`, no `locales`.
 
 ## Platform(s)
@@ -84,9 +91,10 @@ Android (AAB via Google Play only). Android APK and iOS are unaffected.
 
 Yes — release builds only (`apk` vs `aab` EAS profiles, `distribution` internal vs store, same `production` channel). Not Expo Go / dev-client specific.
 
-## Workaround
+## Workarounds
 
-Manually pin `expo_runtime_version` through `locales` JSON (only channel found to survive into Play AAB builds):
+1. Disable app-string translation in Play Console (confirmed fix in #48148), then upload a **new** bundle — already-published bundles keep their injected translations.
+2. Manually pin `expo_runtime_version` through `locales` JSON (forces a locale-qualified value into the bundle that overwrites the translated one):
 
 ```json
 // locales/en.json
@@ -101,13 +109,12 @@ Caution: a locale-qualified `expo_runtime_version` shadows the correct default f
 
 ## Additional context / suggested hypothesis
 
-The config plugin writes the runtime as an indirect, locale-resolved string reference:
+Upstream already has device-level proof of the mechanism in #48148 (open; SDK 55, second confirmation on SDK 57): Play Console's automatic app-string translation injects a locale-qualified `expo_runtime_version` server-side after upload, sourced from translation memory (in #48148: `1.2.1`, two months old, absent from the AAB). The code chain that lets it win:
 
 1. `withRuntimeVersionResource` writes `<string name="expo_runtime_version">` into default `values/strings.xml` — [`packages/@expo/config-plugins/src/android/Updates.ts`](https://github.com/expo/expo/blob/main/packages/@expo/config-plugins/src/android/Updates.ts) (`applyRuntimeVersionFromConfigAsync`).
 2. `setVersionsConfigAsync` writes the manifest entry as a reference: `expo.modules.updates.EXPO_RUNTIME_VERSION = @string/expo_runtime_version` (same file).
 3. `UpdatesConfiguration.getRuntimeVersion()` resolves it at runtime via `context.getMetadataValue(...)`, i.e. with the device's current locale — [`packages/expo-updates/android/src/main/java/expo/modules/updates/UpdatesConfiguration.kt`](https://github.com/expo/expo/blob/main/packages/expo-updates/android/src/main/java/expo/modules/updates/UpdatesConfiguration.kt).
-4. Since SDK 54, `withLocales` writes per-language `values-b+<lang>/strings.xml` — [`packages/@expo/config-plugins/src/android/Locales.ts`](https://github.com/expo/expo/blob/main/packages/@expo/config-plugins/src/android/Locales.ts).
 
-This MRE's local verification shows plain `expo prebuild` bakes the fresh value on clean **and** dirty prebuilds (`setStringItem` replaces in place — [`Strings.ts`](https://github.com/expo/expo/blob/main/packages/@expo/config-plugins/src/android/Strings.ts)), so the staleness likely enters downstream: EAS build-tools (note the *"ensure the same changes are also made in eas-cli and build-tools"* header in `Updates.ts`, with possibly divergent AAB/APK paths) or Play bundletool/split serving. The repo's `inspect-aab.sh` output discriminates the two: stale-in-AAB ⇒ build-time; fresh-in-AAB-but-stale-on-device ⇒ Play-time.
+This MRE's local verification shows plain `expo prebuild` bakes the fresh value on clean **and** dirty prebuilds (`setStringItem` replaces in place — [`Strings.ts`](https://github.com/expo/expo/blob/main/packages/@expo/config-plugins/src/android/Strings.ts)), consistent with "the AAB was always correct" in #48148. Note `translatable="false"` cannot fix the Play path — [#48232](https://github.com/expo/expo/pull/48232)'s verify run measured that `aapt2` strips it, so it never reaches the bundle Play receives; the durable fixes proposed there are a literal manifest value or default-locale resolution in `expo-updates`.
 
-Prior report: #41694.
+Prior reports: #41694, #48148.
