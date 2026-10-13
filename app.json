@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "aab-runtime-repro",
+    "slug": "aab-runtime-repro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/YOUR-EAS-PROJECT-ID"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.aabruntimerepro"
+    },
+    "android": {
+      "package": "com.example.aabruntimerepro",
+      "versionCode": 1,
+      "runtimeVersion": "1.0.0",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-updates"],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR-EAS-PROJECT-ID"
+      }
+    }
+  }
+}

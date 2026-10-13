@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "base": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "apk": {
+      "description": "Universal APK for direct install. Control arm: runtimeVersion is correct here.",
+      "distribution": "internal",
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "aab": {
+      "description": "App Bundle for Google Play. Experimental arm: runtimeVersion goes stale here.",
+      "distribution": "store",
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  }
+}
